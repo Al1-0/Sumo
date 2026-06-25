@@ -138,8 +138,16 @@ void attack() {
   driveForward();
 }
 
+// 360 spin-in-place
 void search() {
-  driveRight();     // rotate looking for opponent
+  digitalWrite(LEFT_F, HIGH);
+  digitalWrite(LEFT_R, LOW);
+
+  digitalWrite(RIGHT_F, LOW);
+  digitalWrite(RIGHT_R, HIGH);
+
+  analogWrite(LEFT_SPEED, 200);
+  analogWrite(RIGHT_SPEED, 200);
 }
 
 void retunToRing() {
