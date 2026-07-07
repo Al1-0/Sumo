@@ -12,14 +12,14 @@ int LEFT_R = 17;    // A3
 // =============================
 // IR Sensor Pins
 // =============================
-int IR_PIN = 7;
+int IR_PIN = 12;
 int LED = 13;
 
 // =============================
 // Ultrasonic Sensor Pins
 // =============================
-#define trigPin 11
-#define echoPin 12
+#define trigPin 4
+#define echoPin 3
 
 #define MAX_RANGE 400
 #define MIN_RANGE 2
