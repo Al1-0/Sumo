@@ -1,0 +1,258 @@
+// =============================
+// Motor Driver Pins
+// =============================
+int RIGHT_SPEED = 9;
+int RIGHT_F = A0;
+int RIGHT_R = A1;
+
+int LEFT_SPEED = 10;
+int LEFT_F = A2;
+int LEFT_R = A3;
+
+// =============================
+// Sensor Position Indexing
+// =============================
+enum IRSensorPos { FRONT_R = 0, FRONT_L = 1, REAR_R = 2, REAR_L = 3 };
+#define NUM_SENSORS 4
+
+// =============================
+// IR Sensor Pins 
+// =============================
+#define IR_FRONT_R 2
+#define IR_FRONT_L 5
+#define IR_REAR_R  6
+#define IR_REAR_L  7
+
+int irPins[NUM_SENSORS] = { IR_FRONT_R, IR_FRONT_L, IR_REAR_R, IR_REAR_L };
+
+#define LED 13 // LED for debugging
+
+// =============================
+// Ultrasonic Sensor Pins (4x)
+// =============================
+enum USSensorPos { MID1 = 0, MID2 = 1, RIGHT = 2, LEFT = 3 };
+#define US_TRIG 4 // shared trigger for all ultrasonic sensors
+
+#define US_ECHO_MID1 8
+#define US_ECHO_MID2 11
+#define US_ECHO_R    12
+#define US_ECHO_L    A6
+
+int usEchoPins[NUM_SENSORS] = { US_ECHO_MID1, US_ECHO_MID2, US_ECHO_R, US_ECHO_L };
+
+#define MAX_RANGE 400
+#define MIN_RANGE 2
+#define SPEED_SOUND 0.0344
+
+// =============================
+// Motor Functions
+// =============================
+
+void stopMotors() {
+  analogWrite(RIGHT_SPEED, 0);
+  analogWrite(LEFT_SPEED, 0);
+
+  digitalWrite(RIGHT_F, LOW);
+  digitalWrite(RIGHT_R, LOW);
+  digitalWrite(LEFT_F, LOW);
+  digitalWrite(LEFT_R, LOW);
+}
+
+void driveForward() {
+  digitalWrite(RIGHT_F, HIGH);
+  digitalWrite(RIGHT_R, LOW);
+
+  digitalWrite(LEFT_F, HIGH);
+  digitalWrite(LEFT_R, LOW);
+
+  analogWrite(RIGHT_SPEED, 200);
+  analogWrite(LEFT_SPEED, 200);
+}
+
+void driveBackward() {
+  digitalWrite(RIGHT_F, LOW);
+  digitalWrite(RIGHT_R, HIGH);
+
+  digitalWrite(LEFT_F, LOW);
+  digitalWrite(LEFT_R, HIGH);
+
+  analogWrite(RIGHT_SPEED, 200);
+  analogWrite(LEFT_SPEED, 200);
+}
+
+void driveRight() {
+  digitalWrite(LEFT_F, HIGH);
+  digitalWrite(LEFT_R, LOW);
+
+  digitalWrite(RIGHT_F, LOW);
+  digitalWrite(RIGHT_R, LOW);
+
+  analogWrite(LEFT_SPEED, 200);
+  analogWrite(RIGHT_SPEED, 0);
+}
+
+void driveLeft() {
+  digitalWrite(LEFT_F, LOW);
+  digitalWrite(LEFT_R, LOW);
+
+  digitalWrite(RIGHT_F, HIGH);
+  digitalWrite(RIGHT_R, LOW);
+
+  analogWrite(LEFT_SPEED, 0);
+  analogWrite(RIGHT_SPEED, 200);
+}
+
+// =============================
+// Ultrasonic Function
+// =============================
+
+/*
+  TIMEOUT VALUE FOR EACH DISTANCE
+
+  - 400cm (senosr maximum) = 23256
+  - 125cm = 7300
+
+*/
+
+float usDist[NUM_SENSORS];
+
+float readOneUltrasonic(int echoPin) {
+  digitalWrite(US_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(US_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(US_TRIG, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 23256); // 400cm max range atm
+  if (duration == 0) return MAX_RANGE; // timeout = nothing detected
+  return (duration / 2.0) * SPEED_SOUND;
+}
+
+void readAllUltrasonic() {
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    usDist[i] = readOneUltrasonic(usEchoPins[i]);
+  }
+}
+
+// =============================
+// IR Sensor Function
+// =============================
+
+bool irEdge[NUM_SENSORS];
+int irCount;
+
+void readAllIR() {
+  irCount = 0;
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    irEdge[i] = (digitalRead(irPins[i]) == LOW);
+    if (irEdge[i]) irCount++;
+  }
+}
+
+// =============================
+// Helper Functions
+// =============================
+
+void attack() {
+  driveForward();
+}
+
+// 360 spin-in-place
+void search() {
+  digitalWrite(LEFT_F, HIGH);
+  digitalWrite(LEFT_R, LOW);
+
+  digitalWrite(RIGHT_F, LOW);
+  digitalWrite(RIGHT_R, HIGH);
+
+  analogWrite(LEFT_SPEED, 200);
+  analogWrite(RIGHT_SPEED, 200);
+}
+
+void retunToRing() {
+  bool frontEdge = irEdge[FRONT_L] || irEdge[FRONT_R];
+  bool rearEdge  = irEdge[REAR_L]  || irEdge[REAR_R];
+
+  if (frontEdge) {
+    driveBackward();
+    delay(400);
+    driveRight();
+    delay(500);
+  } else if (rearEdge) {
+    driveForward();
+    delay(400);
+    driveRight();
+    delay(500);
+  }
+}
+
+// =============================
+// Setup
+// =============================
+
+void setup() {
+
+  Serial.begin(9600);
+
+  // Motor Pins
+  pinMode(RIGHT_SPEED, OUTPUT);
+  pinMode(RIGHT_F, OUTPUT);
+  pinMode(RIGHT_R, OUTPUT);
+
+  pinMode(LEFT_SPEED, OUTPUT);
+  pinMode(LEFT_F, OUTPUT);
+  pinMode(LEFT_R, OUTPUT);
+
+  // Debugging LED
+  pinMode(LED, OUTPUT);
+
+  // IR Sensors
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    pinMode(irPins[i], INPUT);
+  }
+
+  // Ultrasonic sensors
+  pinMode(US_TRIG, OUTPUT);
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    pinMode(usEchoPins[i], INPUT);
+  }
+
+  stopMotors();
+
+  unsigned long startTime = millis();
+  while (millis() - startTime < 5000) { // read sensors during 5-second start of  match
+    readAllUltrasonic();
+    readAllIR();
+    stopMotors();
+    delay(50);
+  }
+}
+
+// =============================
+// Main Loop
+// =============================
+
+void loop() {
+  readAllUltrasonic();
+  readAllIR();
+
+  // ring edge detected by 2 or more sensors
+  if (irCount >= 2) {
+    Serial.println("EDGE DETECTED");
+    retunToRing();
+  }
+
+  // opponent detected (atm works up to 90cm away max)
+  else if ((usDist[MID1] > MIN_RANGE && usDist[MID1] <= 90) || (usDist[MID2] > MIN_RANGE && usDist[MID2] <= 90)) {
+    Serial.println("ATTACK");
+    attack();
+  }
+
+  // nothing detected
+  else {
+    Serial.println("SEARCH");
+    search();
+  }
+
+  delay(50);
+}
