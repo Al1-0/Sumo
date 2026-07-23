@@ -1,13 +1,14 @@
 // =============================
 // Motor Driver Pins
 // =============================
-int RIGHT_SPEED = 9;
-int RIGHT_F = A0;
-int RIGHT_R = A1;
-
-int LEFT_SPEED = 10;
-int LEFT_F = A2;
-int LEFT_R = A3;
+// Motor A
+int RIGHT_SPEED = A0; // prev A6 (enA)
+int RIGHT_F = A1; // (in4)
+int RIGHT_R = A2; // (in3)
+// Motor B
+int LEFT_SPEED = A5; // prev A5 (enB)
+int LEFT_F = A3; // (in2) lowkey dont know which way os forward, can either flip wires or code later
+int LEFT_R = A4; // (in1)
 
 // =============================
 // Sensor Position Indexing
@@ -18,10 +19,10 @@ enum IRSensorPos { FRONT_R = 0, FRONT_L = 1, REAR_R = 2, REAR_L = 3 };
 // =============================
 // IR Sensor Pins
 // =============================
-#define IR_FRONT_R 2 // orange wire
-#define IR_FRONT_L 5 // purple
-#define IR_REAR_R  6 // blue wire
-#define IR_REAR_L  7 // white wire
+#define IR_FRONT_R 2   // Orange
+#define IR_FRONT_L 5   // Purple
+#define IR_REAR_R  6   // Green
+#define IR_REAR_L  7   // Blue 
 
 int irPins[NUM_IR_SENSORS] = { IR_FRONT_R, IR_FRONT_L, IR_REAR_R, IR_REAR_L };
 
@@ -34,9 +35,10 @@ enum USSensorPos { MID1 = 0, RIGHT = 1, LEFT = 2 };
 #define NUM_US_SENSORS 3
 #define US_TRIG 4 // shared trigger for all ultrasonic sensors
 
-#define US_ECHO_MID1 8 //green wire
-#define US_ECHO_R    12 // brown
-#define US_ECHO_L    A6 // yelow wire
+#define US_ECHO_MID1 8   // Green
+#define US_ECHO_L 11  // Brown
+#define US_ECHO_R    12  // Yellow
+// currently nothing #define US_ECHO_L    A0  // 
 
 int usEchoPins[NUM_US_SENSORS] = { US_ECHO_MID1, US_ECHO_R, US_ECHO_L };
 
@@ -65,8 +67,8 @@ void driveForward() {
   digitalWrite(LEFT_F, HIGH);
   digitalWrite(LEFT_R, LOW);
 
-  analogWrite(RIGHT_SPEED, 200);
-  analogWrite(LEFT_SPEED, 200);
+  analogWrite(RIGHT_SPEED, 100);
+  analogWrite(LEFT_SPEED, 100);
 }
 
 void driveBackward() {
@@ -76,8 +78,8 @@ void driveBackward() {
   digitalWrite(LEFT_F, LOW);
   digitalWrite(LEFT_R, HIGH);
 
-  analogWrite(RIGHT_SPEED, 200);
-  analogWrite(LEFT_SPEED, 200);
+  analogWrite(RIGHT_SPEED, 100);
+  analogWrite(LEFT_SPEED, 100);
 }
 
 void pivotRight() {
@@ -98,8 +100,8 @@ void driveRight() {
   digitalWrite(RIGHT_F, LOW);
   digitalWrite(RIGHT_R, HIGH);
 
-  analogWrite(LEFT_SPEED, 200);
-  analogWrite(RIGHT_SPEED, 200);
+  analogWrite(LEFT_SPEED, 1000);
+  analogWrite(RIGHT_SPEED, 100);
 }
 
 void pivotLeft() {
@@ -110,7 +112,7 @@ void pivotLeft() {
   digitalWrite(RIGHT_R, LOW);
 
   analogWrite(LEFT_SPEED, 0);
-  analogWrite(RIGHT_SPEED, 200);
+  analogWrite(RIGHT_SPEED, 100);
 }
 
 void driveLeft() {
@@ -120,8 +122,8 @@ void driveLeft() {
   digitalWrite(RIGHT_F, HIGH);
   digitalWrite(RIGHT_R, LOW);
 
-  analogWrite(LEFT_SPEED, 200);
-  analogWrite(RIGHT_SPEED, 200);
+  analogWrite(LEFT_SPEED, 100);
+  analogWrite(RIGHT_SPEED, 100);
 }
 
 // =============================
@@ -148,6 +150,7 @@ float readOneUltrasonic(int echoPin) {
   long duration = pulseIn(echoPin, HIGH, 23256); // 400cm max range atm
   if (duration == 0) return MAX_RANGE; // timeout = nothing detected
   return (duration / 2.0) * SPEED_SOUND;
+  
 }
 
 void readAllUltrasonic() {
@@ -288,13 +291,14 @@ void loop() {
 
     // --- Sensor log line ---
     Serial.print(F("IR_FRONT_R: "));
-    Serial.print(irEdge[FRONT_R] ? "EDGE" : "SAFE");
+    Serial.print(irEdge[FRONT_R] ? "EDGE!" : "SAFE");
     Serial.print(F(" | IR_FRONT_L: "));
-    Serial.print(irEdge[FRONT_L] ? "EDGE" : "SAFE");
+    Serial.print(irEdge[FRONT_L] ? "EDGE!" : "SAFE");
     Serial.print(F(" | IR_REAR_R: "));
-    Serial.print(irEdge[REAR_R] ? "EDGE" : "SAFE");
+    Serial.print(irEdge[REAR_R] ? "EDGE!" : "SAFE");
     Serial.print(F(" | IR_REAR_L: "));
-    Serial.print(irEdge[REAR_L] ? "EDGE" : "SAFE");
+    Serial.print(irEdge[REAR_L] ? "EDGE!" : "SAFE");
+    Serial.println("----");
     Serial.print(F(" || US_MID1: "));
     Serial.print(usDist[MID1]);
     Serial.print(F("cm | US_RIGHT: "));
@@ -304,14 +308,15 @@ void loop() {
     Serial.println(F("cm"));
     // --- end sensor log ---
 
-  // ring edge detected by 2 or more sensors
-  if (irCount >= 2) {
+  //ring edge detected by 2 or more sensors
+  if (irCount >= 1) {
     Serial.println("EDGE DETECTED");
     retunToRing();
   }
 
-  // opponent detected (atm works up to 90cm away max)
-  else if ((usDist[MID1] > MIN_RANGE && usDist[MID1] <= 90) || 
+  //opponent detected (atm works up to 90cm away max)
+  else 
+  if ((usDist[MID1] > MIN_RANGE && usDist[MID1] <= 90) || 
           (usDist[RIGHT] > MIN_RANGE && usDist[RIGHT] <= 90) || 
           (usDist[LEFT] > MIN_RANGE && usDist[LEFT] <= 90)) {
     Serial.println("ATTACK");
@@ -320,7 +325,7 @@ void loop() {
 
   // nothing detected
   else {
-    Serial.println("SEARCH");
+    //Serial.println("SEARCH");
     search();
   }
 
